@@ -36,24 +36,44 @@ class K_means:
       s += math.sqrt((float(x1[i]) - float(x2[i])) ** 2)
     return s
 
-  def read_image(self,im):
-    if self.i >= self.k :
-      self.i = 0
+  def read_image(self, im):
+    if self.i >= self.k:
+        self.i = 0
     try:
-      img = Image.open(im)
-      osize = img.size
-      img.thumbnail((self.resample,self.resample))
-      v = [float(p)/float(img.size[0]*img.size[1])*100  for p in np.histogram(np.asarray(img))[0]]
-      if self.size :
-        v += [osize[0], osize[1]]
-      pbar.update(1)
-      i = self.i
-      self.i += 1
-      return [i, v, im]
+        img = Image.open(im)
+        osize = img.size
+        img.thumbnail((self.resample, self.resample))
+        
+        # Extract more features - RGB channels separately
+        img_array = np.asarray(img)
+        features = []
+        
+        # Add histogram features for each channel if it's a color image
+        if len(img_array.shape) > 2 and img_array.shape[2] >= 3:
+            for channel in range(3):  # RGB
+                channel_hist = np.histogram(img_array[:,:,channel], bins=8, range=(0,256))[0]
+                # Normalize
+                channel_hist = channel_hist / (img.size[0] * img.size[1]) * 100
+                features.extend(channel_hist)
+        else:
+            # Grayscale image
+            hist = np.histogram(img_array, bins=16, range=(0,256))[0]
+            hist = hist / (img.size[0] * img.size[1]) * 100
+            features.extend(hist)
+            
+        # Add image size features if requested
+        if self.size:
+            # Add size ratio as a feature
+            aspect_ratio = osize[0] / osize[1] if osize[1] > 0 else 0
+            features.extend([osize[0], osize[1], aspect_ratio])
+            
+        pbar.update(1)
+        i = self.i
+        self.i += 1
+        return [i, features, im]
     except Exception as e:
-      print("Error reading ",im,e)
-      return [None, None, None]
-
+        print("Error reading ", im, e)
+        return [None, None, None]
 
   def generate_k_means(self):
     final_mean = []
@@ -103,7 +123,7 @@ ap.add_argument("-r", "--resample", type=int, default=128, help="size to resampl
 ap.add_argument("-s", "--size", default=False, action="store_true", help="use size to compare images")
 ap.add_argument("-m", "--move", default=False, action="store_true", help="move instead of copy")
 args = vars(ap.parse_args())
-types = ('*.jpg', '*.JPG', '*.png', '*.jpeg')
+types = ('*.jpg', '*.JPG', '*.png', '*.jpeg', '*.PNG', '*.JPEG', '*.tiff', '*.TIFF', '*.webp', '*.WEBP')
 imagePaths = []
 folder = args["folder"]
 if not folder.endswith("/") :
